@@ -87,11 +87,55 @@
             flex-direction: column;
             transform: perspective(1000px) rotateZ(-1deg);
             transition: transform 0.3s ease;
+            position: relative;
         }
 
         .slide:hover {
             transform: perspective(1000px) rotateZ(0deg) translateY(-8px);
             box-shadow: 0 15px 50px rgba(255, 107, 157, 0.35), 0 3px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .slide-buttons {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .slide:hover .slide-buttons {
+            opacity: 1;
+        }
+
+        .slide-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #ff6b9d 0%, #d64169 100%);
+            color: white;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .slide-btn:hover {
+            transform: scale(1.15);
+            box-shadow: 0 6px 16px rgba(255, 107, 157, 0.5);
+        }
+
+        .slide-btn-delete {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        }
+
+        .slide-btn-delete:hover {
+            background: linear-gradient(135deg, #ff5555 0%, #dd4a5f 100%);
         }
 
         .slide.active {
@@ -1350,8 +1394,6 @@
             <div class="photos-gallery" id="photosGallery"></div>
 
             <button class="add-more-btn" id="addMoreBtn" onclick="document.getElementById('photoInput').click()">+ Adicionar Mais Fotos</button>
-            
-            <button class="save-photos-btn" id="savePhotosBtn" onclick="saveNewPhotos()">Salvar Nossa Nova História 💕</button>
         </div>
     </div>
 
@@ -1367,7 +1409,7 @@
             </div>
             <div class="caption-modal-buttons">
                 <button class="caption-btn caption-btn-cancel" onclick="closeCaptionModal()">Cancelar</button>
-                <button class="caption-btn caption-btn-save" onclick="saveCaptionAndPhoto()">Salvar Legenda</button>
+                <button class="caption-btn caption-btn-save" onclick="saveCaptionAndPhoto()">Salvar na Nossa História</button>
             </div>
         </div>
     </div>
@@ -1376,6 +1418,7 @@
         function startCarousel() {
             document.getElementById('intro-screen').classList.add('hidden');
             document.getElementById('carousel-container').classList.remove('hidden');
+            loadStoredPhotos();
             showSlide(currentSlide);
         }
 
@@ -1383,17 +1426,139 @@
         let autoplayInterval = null;
         let isAutoplay = false;
 
-        const totalSlides = document.querySelectorAll('.slide').length;
+        let totalSlides = document.querySelectorAll('.slide').length;
         document.getElementById('total-slides').textContent = totalSlides;
 
-        // Criar os dots
+        // Adicionar botões de editar e deletar às fotos predefinidas
+        function addButtonsToSlides() {
+            const slides = document.querySelectorAll('.slide');
+            slides.forEach((slide, index) => {
+                // Verificar se o slide já tem botões
+                if (!slide.querySelector('.slide-buttons')) {
+                    const buttonsDiv = document.createElement('div');
+                    buttonsDiv.className = 'slide-buttons';
+                    buttonsDiv.setAttribute('data-slide-index', index);
+                    buttonsDiv.innerHTML = `
+                        <button class="slide-btn" onclick="editSlide(${index})" title="Editar">✏️</button>
+                        <button class="slide-btn slide-btn-delete" onclick="deleteSlide(${index})" title="Deletar">🗑️</button>
+                    `;
+                    slide.appendChild(buttonsDiv);
+                }
+            });
+        }
+
+        addButtonsToSlides();
+
+        // Criar os dots iniciais
         const dotsContainer = document.getElementById('dots-container');
-        for (let i = 1; i <= totalSlides; i++) {
-            const dot = document.createElement('div');
-            dot.className = 'dot';
-            if (i === 1) dot.classList.add('active');
-            dot.onclick = () => goToSlide(i);
-            dotsContainer.appendChild(dot);
+        function recreateDots() {
+            dotsContainer.innerHTML = '';
+            for (let i = 1; i <= totalSlides; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                if (i === currentSlide) dot.classList.add('active');
+                dot.onclick = () => goToSlide(i);
+                dotsContainer.appendChild(dot);
+            }
+        }
+        recreateDots();
+
+        function loadStoredPhotos() {
+            const stored = localStorage.getItem('carouselPhotos');
+            if (stored) {
+                const photos = JSON.parse(stored);
+                photos.forEach(photo => {
+                    addSlideToCarousel(photo.photo, photo.caption);
+                });
+            }
+        }
+
+        function addSlideToCarousel(photoData, caption) {
+            const carousel = document.querySelector('.carousel');
+            const newSlide = document.createElement('div');
+            newSlide.className = 'slide';
+            
+            newSlide.innerHTML = `
+                <img src="${photoData}" alt="Foto adicionada">
+                <div class="slide-text">${caption}</div>
+            `;
+            carousel.appendChild(newSlide);
+            
+            // Adicionar botões após inserir no DOM
+            const buttonsDiv = document.createElement('div');
+            buttonsDiv.className = 'slide-buttons';
+            
+            // Calcular índice baseado na posição no DOM
+            const slideIndex = carousel.querySelectorAll('.slide').length - 1;
+            buttonsDiv.setAttribute('data-slide-index', slideIndex);
+            buttonsDiv.innerHTML = `
+                <button class="slide-btn" onclick="editSlide(${slideIndex})" title="Editar">✏️</button>
+                <button class="slide-btn slide-btn-delete" onclick="deleteSlide(${slideIndex})" title="Deletar">🗑️</button>
+            `;
+            newSlide.appendChild(buttonsDiv);
+            
+            totalSlides++;
+            document.getElementById('total-slides').textContent = totalSlides;
+            recreateDots();
+        }
+
+        function editSlide(slideIndex) {
+            const carousel = document.querySelector('.carousel');
+            const slides = carousel.querySelectorAll('.slide');
+            
+            if (slideIndex < 0 || slideIndex >= slides.length) return;
+            
+            const slide = slides[slideIndex];
+            const img = slide.querySelector('img');
+            const caption = slide.querySelector('.slide-text').textContent;
+            
+            // Armazenar informação do slide sendo editado
+            window.editingSlideIndex = slideIndex;
+            window.editingSlideElement = slide;
+            
+            // Abrir modal com a legenda atual
+            document.getElementById('captionPreview').src = img.src;
+            document.getElementById('captionInput').value = caption;
+            document.getElementById('captionModal').classList.add('show');
+            document.getElementById('captionInput').focus();
+        }
+
+        function deleteSlide(slideIndex) {
+            const carousel = document.querySelector('.carousel');
+            const slides = carousel.querySelectorAll('.slide');
+            
+            if (slideIndex < 0 || slideIndex >= slides.length) return;
+            
+            // Confirmar exclusão
+            if (confirm('Tem certeza que deseja deletar esta foto? 😢')) {
+                const slide = slides[slideIndex];
+                slide.remove();
+                
+                totalSlides--;
+                document.getElementById('total-slides').textContent = totalSlides;
+                recreateDots();
+                
+                // Atualizar índices dos slide-buttons após deletar
+                const allSlides = carousel.querySelectorAll('.slide');
+                allSlides.forEach((s, idx) => {
+                    const buttons = s.querySelector('.slide-buttons');
+                    if (buttons) {
+                        buttons.setAttribute('data-slide-index', idx);
+                        const editBtn = buttons.querySelector('.slide-btn:first-child');
+                        const delBtn = buttons.querySelector('.slide-btn-delete');
+                        editBtn.onclick = () => editSlide(idx);
+                        delBtn.onclick = () => deleteSlide(idx);
+                    }
+                });
+                
+                // Se foi a foto atual, voltar para a anterior
+                if (currentSlide > totalSlides) {
+                    currentSlide = totalSlides;
+                }
+                
+                showSlide(currentSlide);
+                alert('Foto deletada com sucesso!');
+            }
         }
 
         function showSlide(n) {
@@ -1402,11 +1567,10 @@
             const newPhotosSection = document.getElementById('new-photos-section');
 
             if (n > totalSlides) {
-                currentSlide = totalSlides;
+                // Mostrar seção de novas fotos
                 newPhotosSection.classList.add('show');
                 slides.forEach(slide => slide.classList.remove('active'));
                 dots.forEach(dot => dot.classList.remove('active'));
-                loadNewPhotos();
                 return;
             }
 
@@ -1414,6 +1578,7 @@
                 currentSlide = 1;
             }
 
+            // Esconder seção de novas fotos e mostrar carrossel
             newPhotosSection.classList.remove('show');
             slides.forEach(slide => slide.classList.remove('active'));
             dots.forEach(dot => dot.classList.remove('active'));
@@ -1427,6 +1592,7 @@
 
         function changeSlide(n) {
             currentSlide += n;
+            if (currentSlide < 1) currentSlide = 1;
             showSlide(currentSlide);
         }
 
@@ -1489,59 +1655,9 @@
                 changeSlide(-1);
             }
         }
-
-        // LocalStorage para novas fotos
+        // Controlar fotos adicionadas
         let newPhotosArray = [];
         let currentPhotoBeingCaptioned = null;
-
-        function loadNewPhotos() {
-            const saved = localStorage.getItem('newPhotos');
-            if (saved) {
-                newPhotosArray = JSON.parse(saved);
-            }
-            displayNewPhotos();
-        }
-
-        function displayNewPhotos() {
-            const gallery = document.getElementById('photosGallery');
-            const noPhotosMsg = document.getElementById('noPhotosMessage');
-            gallery.innerHTML = '';
-
-            if (newPhotosArray.length === 0) {
-                noPhotosMsg.style.display = 'block';
-                return;
-            }
-
-            noPhotosMsg.style.display = 'none';
-
-            newPhotosArray.forEach((photoObj, index) => {
-                const photoItem = document.createElement('div');
-                photoItem.className = 'photo-item';
-                const caption = photoObj.caption || 'Sem legenda';
-                photoItem.innerHTML = `
-                    <img src="${photoObj.photo}" alt="Foto ${index + 1}">
-                    <div class="photo-caption" title="${caption}">${caption}</div>
-                    <button class="photo-remove" onclick="removePhoto(${index})" title="Remover">✕</button>
-                `;
-                gallery.appendChild(photoItem);
-            });
-        }
-
-        function removePhoto(index) {
-            newPhotosArray.splice(index, 1);
-            localStorage.setItem('newPhotos', JSON.stringify(newPhotosArray));
-            displayNewPhotos();
-        }
-
-        function saveNewPhotos() {
-            if (newPhotosArray.length === 0) {
-                alert('Por favor, adicione pelo menos uma foto antes de salvar!');
-                return;
-            }
-            alert('Fotos salvas com sucesso! Sua história continua a partir de hoje. 💕');
-        }
-
-        // Funções de Modal de Legenda
         function openCaptionModal(photoData) {
             currentPhotoBeingCaptioned = photoData;
             document.getElementById('captionPreview').src = photoData;
@@ -1563,14 +1679,35 @@
                 return;
             }
 
-            newPhotosArray.push({
+            // Verificar se estamos editando um slide existente
+            if (window.editingSlideIndex !== undefined && window.editingSlideElement) {
+                // Editar slide existente
+                const slideText = window.editingSlideElement.querySelector('.slide-text');
+                slideText.textContent = caption;
+                
+                closeCaptionModal();
+                window.editingSlideIndex = undefined;
+                window.editingSlideElement = null;
+                alert('Legenda atualizada! 💕');
+                return;
+            }
+
+            // Adicionar nova foto
+            const photoObj = {
                 photo: currentPhotoBeingCaptioned,
                 caption: caption
-            });
+            };
 
-            localStorage.setItem('newPhotos', JSON.stringify(newPhotosArray));
-            displayNewPhotos();
+            // Adicionar ao carrossel
+            addSlideToCarousel(photoObj.photo, photoObj.caption);
+
+            // Salvar em localStorage
+            if (!newPhotosArray) newPhotosArray = [];
+            newPhotosArray.push(photoObj);
+            localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+
             closeCaptionModal();
+            alert('Foto adicionada ao carrossel! 💕');
         }
 
         // Fechar modal ao clicar fora
