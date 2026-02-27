@@ -1466,8 +1466,8 @@
         function loadStoredPhotos() {
             const stored = localStorage.getItem('carouselPhotos');
             if (stored) {
-                const photos = JSON.parse(stored);
-                photos.forEach(photo => {
+                newPhotosArray = JSON.parse(stored); // Sincronizar com localStorage
+                newPhotosArray.forEach(photo => {
                     addSlideToCarousel(photo.photo, photo.caption);
                 });
             }
@@ -1532,6 +1532,21 @@
             // Confirmar exclusão
             if (confirm('Tem certeza que deseja deletar esta foto? 😢')) {
                 const slide = slides[slideIndex];
+                const slideImg = slide.querySelector('img').src;
+                const slideCaption = slide.querySelector('.slide-text').textContent;
+                
+                // Se for uma foto adicionada (não predefinida), remover do localStorage
+                const isStoredPhoto = newPhotosArray.some(photo => 
+                    photo.photo === slideImg && photo.caption === slideCaption
+                );
+                
+                if (isStoredPhoto) {
+                    newPhotosArray = newPhotosArray.filter(photo => 
+                        !(photo.photo === slideImg && photo.caption === slideCaption)
+                    );
+                    localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+                }
+                
                 slide.remove();
                 
                 totalSlides--;
@@ -1683,7 +1698,15 @@
             if (window.editingSlideIndex !== undefined && window.editingSlideElement) {
                 // Editar slide existente
                 const slideText = window.editingSlideElement.querySelector('.slide-text');
+                const oldCaption = slideText.textContent;
                 slideText.textContent = caption;
+                
+                // Atualizar no localStorage se for uma foto adicionada
+                const photoIndex = newPhotosArray.findIndex(photo => photo.caption === oldCaption);
+                if (photoIndex !== -1) {
+                    newPhotosArray[photoIndex].caption = caption;
+                    localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+                }
                 
                 closeCaptionModal();
                 window.editingSlideIndex = undefined;
