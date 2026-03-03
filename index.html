@@ -1381,6 +1381,9 @@
         let supabaseClient = null;
         let syncEnabled = true;
         
+        // Bucket do Storage
+        const STORAGE_BUCKET = 'fotos';
+        
         // Armazenamento seguro com fallback para Tracking Prevention
         const StorageManager = {
             setItem: (key, value) => {
@@ -1937,17 +1940,71 @@
             alert('Foto adicionada ao carrossel! 💕');
         }
         
+        // Função para fazer upload da imagem para o Supabase Storage
+        async function uploadImageToStorage(base64Image, fileName) {
+            try {
+                console.log('📤 Fazendo upload da imagem para Storage...');
+                
+                // Converter base64 para blob
+                const blob = await fetch(base64Image).then(res => res.blob());
+                
+                // Gerar nome único
+                const uniqueName = `${Date.now()}_${fileName}`;
+                
+                // Upload para o Storage
+                const { data, error } = await supabaseClient
+                    .storage
+                    .from(STORAGE_BUCKET)
+                    .upload(uniqueName, blob, {
+                        cacheControl: '3600',
+                        upsert: false,
+                        contentType: blob.type || 'image/jpeg'
+                    });
+                
+                if (error) {
+                    console.error('❌ Erro no upload:', error);
+                    throw error;
+                }
+                
+                // Pegar URL pública
+                const { data: urlData } = supabaseClient
+                    .storage
+                    .from(STORAGE_BUCKET)
+                    .getPublicUrl(uniqueName);
+                
+                console.log('✅ Upload concluído! URL:', urlData.publicUrl);
+                return urlData.publicUrl;
+                
+            } catch (error) {
+                console.error('❌ Erro ao fazer upload:', error);
+                throw error;
+            }
+        }
+        
         async function saveFotoOnSupabase(photoObj) {
             try {
                 syncEnabled = false; // Desabilitar sync temporariamente
                 
                 console.log('📤 Salvando foto no Supabase...');
-                console.log('Tamanho da foto:', photoObj.photo.length, 'caracteres');
+                
+                // Primeiro, fazer upload da imagem para o Storage
+                let imageUrl = photoObj.photo;
+                
+                // Se for base64 (URL local), fazer upload
+                if (photoObj.photo.startsWith('data:')) {
+                    try {
+                        imageUrl = await uploadImageToStorage(photoObj.photo, 'foto.jpg');
+                    } catch (uploadError) {
+                        console.warn('⚠️ Upload falhou, tentando salvar base64 diretamente');
+                        // Se o upload falhar (bucket não existe), salva base64 diretamente
+                        // Isso vai funcionar apenas se o banco aceitar textos grandes
+                    }
+                }
                 
                 const { data, error } = await supabaseClient
                     .from('fotos_compartilhadas')
                     .insert([{
-                        foto: photoObj.photo,
+                        foto: imageUrl,
                         legenda: photoObj.caption,
                         usuario_id: StorageManager.getItem('userId') || 'anonimo',
                         deletado: false,
@@ -1964,6 +2021,7 @@
                     const photoIndex = newPhotosArray.findIndex(p => p.photo === photoObj.photo && p.caption === photoObj.caption);
                     if (photoIndex !== -1) {
                         newPhotosArray[photoIndex].id = data[0].id;
+                        newPhotosArray[photoIndex].photo = imageUrl; // Atualizar com URL do Storage
                         StorageManager.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
                     }
                     console.log('✅ Foto sincronizada com sucesso! ID:', data[0].id);
