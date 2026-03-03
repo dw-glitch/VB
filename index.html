@@ -2,10 +2,10 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#667eea">
-    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-standalone" content="yes">
     <title>Nossa História</title>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
     <!-- Supabase SDK -->
@@ -70,16 +70,19 @@
             position: relative;
             width: 100%;
             margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 600px;
         }
 
         .slide {
-            display: none;
+            position: absolute;
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 3/4;
             text-align: center;
             animation: fadeIn 0.8s ease-in-out;
-            margin: 0 auto;
-            max-width: 450px;
-            width: 100%;
-            aspect-ratio: 3/4;
             background: white;
             padding: 20px;
             border-radius: 8px;
@@ -88,12 +91,19 @@
             display: flex;
             flex-direction: column;
             transform: perspective(1000px) rotateZ(-1deg);
-            transition: transform 0.3s ease;
-            position: relative;
+            transition: opacity 0.5s ease;
+            margin: 0 auto;
+            left: 0;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%) perspective(1000px) rotateZ(-1deg);
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
         }
 
         .slide:hover {
-            transform: perspective(1000px) rotateZ(0deg) translateY(-8px);
+            transform: translateY(-50%) perspective(1000px) rotateZ(0deg) translateY(-8px);
             box-shadow: 0 15px 50px rgba(255, 107, 157, 0.35), 0 3px 8px rgba(0, 0, 0, 0.2);
         }
 
@@ -141,7 +151,9 @@
         }
 
         .slide.active {
-            display: flex;
+            opacity: 1;
+            pointer-events: auto;
+            visibility: visible;
         }
 
         @keyframes fadeIn {
@@ -321,65 +333,6 @@
             background: linear-gradient(135deg, #ff6b9d 0%, #d64169 100%);
             transform: scale(1.4);
             box-shadow: 0 4px 12px rgba(255, 107, 157, 0.4);
-        }
-
-        .title {
-            text-align: center;
-            font-size: 42px;
-            background: linear-gradient(135deg, #ff6b9d 0%, #d64169 50%, #f093fb 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 35px;
-            font-weight: 800;
-            text-shadow: none;
-            letter-spacing: -0.5px;
-        }
-
-        .carousel {
-            position: relative;
-            width: 100%;
-            margin-bottom: 30px;
-            background: linear-gradient(135deg, rgba(255, 107, 157, 0.05) 0%, rgba(240, 147, 251, 0.05) 100%);
-            border-radius: 15px;
-            padding: 30px 20px;
-            border: 1px solid rgba(255, 107, 157, 0.1);
-        }
-
-        .slide {
-            display: none;
-            text-align: center;
-            animation: fadeIn 0.8s ease-in-out;
-        }
-
-        .slide.active {
-            display: block;
-        }
-
-        .slide img {
-            width: 100%;
-            max-width: 500px;
-            height: auto;
-            border-radius: 18px;
-            box-shadow: 0 15px 40px rgba(255, 107, 157, 0.25);
-            object-fit: cover;
-            animation: zoomIn 0.8s ease-out;
-            border: 3px solid rgba(255, 107, 157, 0.1);
-        }
-
-        .slide-text {
-            margin-top: 28px;
-            padding: 24px;
-            background: linear-gradient(135deg, #ff6b9d 0%, #d64169 100%);
-            color: white;
-            border-radius: 15px;
-            font-size: 17px;
-            line-height: 1.8;
-            font-style: italic;
-            animation: slideInLeft 0.8s ease-out 0.3s both;
-            box-shadow: 0 8px 20px rgba(255, 107, 157, 0.3);
-            font-weight: 500;
-            letter-spacing: 0.3px;
         }
 
         .final-message {
@@ -977,6 +930,7 @@
                 padding: 10px 0;
                 display: flex;
                 justify-content: center;
+                min-height: 550px;
             }
 
             .slide {
@@ -1090,11 +1044,12 @@
                 padding: 10px 0;
                 display: flex;
                 justify-content: center;
+                min-height: 500px;
             }
 
             .slide {
                 max-width: 320px;
-                width: 100%;
+                width: 90%;
                 padding: 12px;
             }
 
@@ -1294,7 +1249,8 @@
         <div class="intro-content">
             <span class="intro-emoji">💕</span>
             <h1 class="intro-title">Meu coração pra você</h1>
-                       <button class="intro-button" onclick="startCarousel()">Clica aqui neném</button>
+            <p class="intro-subtitle">Clique para ver nossa história</p>
+            <button class="intro-button" onclick="startCarousel()">Clica aqui neném</button>
         </div>
     </div>
 
@@ -1418,26 +1374,59 @@
 
     <script>
         // ⚠️ CONFIGURE AQUI COM SUAS CREDENCIAIS DO SUPABASE
-        const SUPABASE_URL = 'https://pblordsofvivlvabesbr.supabase.co'; // Substitua com seu URL
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBibG9yZHNvZnZpdmx2YWJlc2JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NDEwMTMsImV4cCI6MjA4ODExNzAxM30.2ToYSIDiyzXKzDjUbXbyXxIxAvGDlpsHfprBLfZz4_k'; // Substitua com sua Anon Key
+        const SUPABASE_URL = 'https://pblordsofvivlvabesbr.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBibG9yZHNvZnZpdmx2YWJlc2JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NDEwMTMsImV4cCI6MjA4ODExNzAxM30.2ToYSIDiyzXKzDjUbXbyXxIxAvGDlpsHfprBLfZz4_k';
         
-        // Inicializar Supabase
-        const { createClient } = window.supabase;
-        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        let supabaseClient = null;
+        let syncEnabled = true;
         
-        let syncEnabled = true; // Flag para evitar loops infinitos
-        function startCarousel() {
-            document.getElementById('intro-screen').classList.add('hidden');
-            document.getElementById('carousel-container').classList.remove('hidden');
-            
-            // Gerar ID único para usuário (se não tiver)
-            if (!localStorage.getItem('userId')) {
-                localStorage.setItem('userId', 'user_' + Date.now());
+        // Armazenamento seguro com fallback para Tracking Prevention
+        const StorageManager = {
+            setItem: (key, value) => {
+                try { localStorage.setItem(key, value); } 
+                catch(e) { console.warn('localStorage indisponível (Tracking Prevention)'); }
+            },
+            getItem: (key) => {
+                try { return localStorage.getItem(key); } 
+                catch(e) { return null; }
             }
-            
-            loadStoredPhotos();
-            setupRealtimeSync(); // Iniciar sincronização em tempo real
-            showSlide(currentSlide);
+        };
+
+        async function startCarousel() {
+            try {
+                // Inicializar Supabase na primeira execução
+                if (!supabaseClient) {
+                    const { createClient } = window.supabase;
+                    supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
+                }
+
+                console.log('🚀 Iniciando carrossel...');
+                
+                document.getElementById('intro-screen').classList.add('hidden');
+                document.getElementById('carousel-container').classList.remove('hidden');
+                
+                // Gerar ID único para usuário (se não tiver)
+                if (!StorageManager.getItem('userId')) {
+                    StorageManager.setItem('userId', 'user_' + Date.now());
+                }
+                
+                // Carregar fotos de forma síncrona
+                loadStoredPhotos();
+                
+                // Aguardar carregamento do Supabase
+                await loadPhotosFromSupabase();
+                
+                // Setup da sincronização em tempo real
+                setupRealtimeSync();
+                
+                // Mostrar primeiro slide
+                showSlide(currentSlide);
+                
+                console.log('✅ Carrossel iniciado com sucesso!');
+            } catch (error) {
+                console.error('❌ Erro ao iniciar carrossel:', error);
+                alert('Erro ao iniciar. Tente novamente ou recarregue a página.');
+            }
         }
 
         let currentSlide = 1;
@@ -1483,7 +1472,7 @@
 
         function loadStoredPhotos() {
             // Carregar do localStorage inicialmente
-            const stored = localStorage.getItem('carouselPhotos');
+            const stored = StorageManager.getItem('carouselPhotos');
             if (stored) {
                 newPhotosArray = JSON.parse(stored);
                 newPhotosArray.forEach(photo => {
@@ -1498,7 +1487,7 @@
         async function loadPhotosFromSupabase() {
             try {
                 // Buscar fotos que não foram deletadas
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('fotos_compartilhadas')
                     .select('*')
                     .eq('deletado', false)
@@ -1527,7 +1516,7 @@
                     });
                     
                     // Atualizar localStorage
-                    localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+                    StorageManager.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
                     
                     syncEnabled = true;
                 }
@@ -1538,7 +1527,7 @@
         
         // Sincronização em tempo real com Supabase
         function setupRealtimeSync() {
-            supabase
+            supabaseClient
                 .channel('fotos_compartilhadas')
                 .on(
                     'postgres_changes',
@@ -1656,7 +1645,7 @@
                     
                     // Remover do array
                     newPhotosArray.splice(photoIndex, 1);
-                    localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+                    StorageManager.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
                     
                     // Deletar no Supabase
                     if (photoId) {
@@ -1697,7 +1686,7 @@
             try {
                 syncEnabled = false;
                 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('fotos_compartilhadas')
                     .update({ deletado: true })
                     .eq('id', fotoId);
@@ -1778,9 +1767,6 @@
             }
         }
 
-        // Inicializar
-        showSlide(currentSlide);
-
         // Navegar com setas do teclado
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowLeft') changeSlide(-1);
@@ -1844,7 +1830,7 @@
                 const photoIndex = newPhotosArray.findIndex(photo => photo.caption === oldCaption);
                 if (photoIndex !== -1) {
                     newPhotosArray[photoIndex].caption = caption;
-                    localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+                    StorageManager.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
                     
                     // Atualizar no Supabase se tiver ID
                     if (newPhotosArray[photoIndex].id) {
@@ -1871,7 +1857,7 @@
             // Salvar em localStorage
             if (!newPhotosArray) newPhotosArray = [];
             newPhotosArray.push(photoObj);
-            localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+            StorageManager.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
 
             // Salvar no Supabase
             saveFotoOnSupabase(photoObj);
@@ -1884,12 +1870,12 @@
             try {
                 syncEnabled = false; // Desabilitar sync temporariamente
                 
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('fotos_compartilhadas')
                     .insert([{
                         foto: photoObj.photo,
                         legenda: photoObj.caption,
-                        usuario_id: localStorage.getItem('userId') || 'anonimo'
+                        usuario_id: StorageManager.getItem('userId') || 'anonimo'
                     }])
                     .select();
                 
@@ -1912,7 +1898,7 @@
         
         async function updateFotoOnSupabase(fotoId, novaLegenda) {
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('fotos_compartilhadas')
                     .update({ legenda: novaLegenda })
                     .eq('id', fotoId);
