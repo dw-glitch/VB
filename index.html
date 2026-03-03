@@ -8,6 +8,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Nossa História</title>
     <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Comfortaa:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -1415,10 +1417,26 @@
     </div>
 
     <script>
+        // ⚠️ CONFIGURE AQUI COM SUAS CREDENCIAIS DO SUPABASE
+        const SUPABASE_URL = 'https://pblordsofvivlvabesbr.supabase.co'; // Substitua com seu URL
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBibG9yZHNvZnZpdmx2YWJlc2JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NDEwMTMsImV4cCI6MjA4ODExNzAxM30.2ToYSIDiyzXKzDjUbXbyXxIxAvGDlpsHfprBLfZz4_k'; // Substitua com sua Anon Key
+        
+        // Inicializar Supabase
+        const { createClient } = window.supabase;
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        
+        let syncEnabled = true; // Flag para evitar loops infinitos
         function startCarousel() {
             document.getElementById('intro-screen').classList.add('hidden');
             document.getElementById('carousel-container').classList.remove('hidden');
+            
+            // Gerar ID único para usuário (se não tiver)
+            if (!localStorage.getItem('userId')) {
+                localStorage.setItem('userId', 'user_' + Date.now());
+            }
+            
             loadStoredPhotos();
+            setupRealtimeSync(); // Iniciar sincronização em tempo real
             showSlide(currentSlide);
         }
 
@@ -1464,13 +1482,106 @@
         recreateDots();
 
         function loadStoredPhotos() {
+            // Carregar do localStorage inicialmente
             const stored = localStorage.getItem('carouselPhotos');
             if (stored) {
-                newPhotosArray = JSON.parse(stored); // Sincronizar com localStorage
+                newPhotosArray = JSON.parse(stored);
                 newPhotosArray.forEach(photo => {
                     addSlideToCarousel(photo.photo, photo.caption);
                 });
             }
+            
+            // Carregar do Supabase
+            loadPhotosFromSupabase();
+        }
+        
+        async function loadPhotosFromSupabase() {
+            try {
+                // Buscar fotos que não foram deletadas
+                const { data, error } = await supabase
+                    .from('fotos_compartilhadas')
+                    .select('*')
+                    .eq('deletado', false)
+                    .order('criado_em', { ascending: true });
+                
+                if (error) {
+                    console.warn('Erro ao carregar fotos do Supabase:', error);
+                    return;
+                }
+                
+                if (data && data.length > 0) {
+                    syncEnabled = false; // Não sincronizar ao carregar
+                    
+                    data.forEach(row => {
+                        // Verificar se foto já existe
+                        const exists = newPhotosArray.some(p => p.id === row.id);
+                        if (!exists) {
+                            const photo = {
+                                id: row.id,
+                                photo: row.foto,
+                                caption: row.legenda
+                            };
+                            newPhotosArray.push(photo);
+                            addSlideToCarousel(photo.photo, photo.caption);
+                        }
+                    });
+                    
+                    // Atualizar localStorage
+                    localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+                    
+                    syncEnabled = true;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar fotos do Supabase:', error);
+            }
+        }
+        
+        // Sincronização em tempo real com Supabase
+        function setupRealtimeSync() {
+            supabase
+                .channel('fotos_compartilhadas')
+                .on(
+                    'postgres_changes',
+                    { 
+                        event: '*', 
+                        schema: 'public', 
+                        table: 'fotos_compartilhadas' 
+                    },
+                    (payload) => {
+                        if (!syncEnabled) return;
+                        
+                        if (payload.eventType === 'INSERT') {
+                            // Nova foto foi adicionada em outro dispositivo
+                            const newPhoto = {
+                                id: payload.new.id,
+                                photo: payload.new.foto,
+                                caption: payload.new.legenda
+                            };
+                            
+                            // Verificar se já existe
+                            const exists = newPhotosArray.some(p => p.id === newPhoto.id);
+                            if (!exists) {
+                                newPhotosArray.push(newPhoto);
+                                addSlideToCarousel(newPhoto.photo, newPhoto.caption);
+                                console.log('📸 Nova foto sincronizada de outro dispositivo!');
+                            }
+                        } else if (payload.eventType === 'DELETE') {
+                            // Foto foi deletada em outro dispositivo
+                            newPhotosArray = newPhotosArray.filter(p => p.id !== payload.old.id);
+                            
+                            const carousel = document.querySelector('.carousel');
+                            const slides = carousel.querySelectorAll('.slide');
+                            slides.forEach((slide, idx) => {
+                                if (slide.dataset.photoId === payload.old.id) {
+                                    slide.remove();
+                                }
+                            });
+                            
+                            console.log('🗑️ Foto deletada sincronizada!');
+                        }
+                    }
+                )
+                .subscribe();
         }
 
         function addSlideToCarousel(photoData, caption) {
@@ -1535,16 +1646,22 @@
                 const slideImg = slide.querySelector('img').src;
                 const slideCaption = slide.querySelector('.slide-text').textContent;
                 
-                // Se for uma foto adicionada (não predefinida), remover do localStorage
-                const isStoredPhoto = newPhotosArray.some(photo => 
+                // Se for uma foto adicionada (não predefinida), remover do localStorage e Supabase
+                const photoIndex = newPhotosArray.findIndex(photo => 
                     photo.photo === slideImg && photo.caption === slideCaption
                 );
                 
-                if (isStoredPhoto) {
-                    newPhotosArray = newPhotosArray.filter(photo => 
-                        !(photo.photo === slideImg && photo.caption === slideCaption)
-                    );
+                if (photoIndex !== -1) {
+                    const photoId = newPhotosArray[photoIndex].id;
+                    
+                    // Remover do array
+                    newPhotosArray.splice(photoIndex, 1);
                     localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+                    
+                    // Deletar no Supabase
+                    if (photoId) {
+                        deleteFotoFromSupabase(photoId);
+                    }
                 }
                 
                 slide.remove();
@@ -1573,6 +1690,28 @@
                 
                 showSlide(currentSlide);
                 alert('Foto deletada com sucesso!');
+            }
+        }
+        
+        async function deleteFotoFromSupabase(fotoId) {
+            try {
+                syncEnabled = false;
+                
+                const { error } = await supabase
+                    .from('fotos_compartilhadas')
+                    .update({ deletado: true })
+                    .eq('id', fotoId);
+                
+                if (error) {
+                    console.error('Erro ao deletar do Supabase:', error);
+                } else {
+                    console.log('✅ Foto deletada no Supabase!');
+                }
+                
+                syncEnabled = true;
+            } catch (error) {
+                console.error('Erro ao deletar foto:', error);
+                syncEnabled = true;
             }
         }
 
@@ -1706,6 +1845,11 @@
                 if (photoIndex !== -1) {
                     newPhotosArray[photoIndex].caption = caption;
                     localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
+                    
+                    // Atualizar no Supabase se tiver ID
+                    if (newPhotosArray[photoIndex].id) {
+                        updateFotoOnSupabase(newPhotosArray[photoIndex].id, caption);
+                    }
                 }
                 
                 closeCaptionModal();
@@ -1729,8 +1873,58 @@
             newPhotosArray.push(photoObj);
             localStorage.setItem('carouselPhotos', JSON.stringify(newPhotosArray));
 
+            // Salvar no Supabase
+            saveFotoOnSupabase(photoObj);
+
             closeCaptionModal();
             alert('Foto adicionada ao carrossel! 💕');
+        }
+        
+        async function saveFotoOnSupabase(photoObj) {
+            try {
+                syncEnabled = false; // Desabilitar sync temporariamente
+                
+                const { data, error } = await supabase
+                    .from('fotos_compartilhadas')
+                    .insert([{
+                        foto: photoObj.photo,
+                        legenda: photoObj.caption,
+                        usuario_id: localStorage.getItem('userId') || 'anonimo'
+                    }])
+                    .select();
+                
+                if (error) {
+                    console.error('Erro ao salvar no Supabase:', error);
+                    alert('⚠️ Foto salva localmente. Erro ao sincronizar com outros dispositivos.');
+                } else if (data && data.length > 0) {
+                    // Atualizar o array com o ID retornado
+                    const lastPhoto = newPhotosArray[newPhotosArray.length - 1];
+                    lastPhoto.id = data[0].id;
+                    console.log('✅ Foto sincronizada com sucesso!');
+                }
+                
+                syncEnabled = true;
+            } catch (error) {
+                console.error('Erro ao salvar foto no Supabase:', error);
+                syncEnabled = true;
+            }
+        }
+        
+        async function updateFotoOnSupabase(fotoId, novaLegenda) {
+            try {
+                const { error } = await supabase
+                    .from('fotos_compartilhadas')
+                    .update({ legenda: novaLegenda })
+                    .eq('id', fotoId);
+                
+                if (error) {
+                    console.error('Erro ao atualizar legenda no Supabase:', error);
+                } else {
+                    console.log('✅ Legenda atualizada no Supabase!');
+                }
+            } catch (error) {
+                console.error('Erro ao atualizar legenda:', error);
+            }
         }
 
         // Fechar modal ao clicar fora
